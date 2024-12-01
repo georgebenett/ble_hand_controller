@@ -6,26 +6,10 @@
 #include "ble_spp_client.h"
 #include "adc.h"
 #include "lcd.h"
+#include "ui.h"
 
 #define TAG "MAIN"
 
-static lv_obj_t *adc_label = NULL;
-static char adc_str[32];
-
-static void update_display_task(void *pvParameters) {
-    TickType_t last_wake_time = xTaskGetTickCount();
-    
-    while (1) {
-        uint32_t adc_value = adc_get_latest_value();
-        snprintf(adc_str, sizeof(adc_str), "%lu", adc_value);
-        
-        if (adc_label != NULL) {
-            lv_label_set_text(adc_label, adc_str);
-        }
-        
-        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(20));
-    }
-}
 
 void app_main(void)
 {
@@ -54,16 +38,13 @@ void app_main(void)
 
     // Initialize LCD and LVGL
     lcd_init();
-    
-    // Create and configure display label
-    adc_label = lcd_create_label("0");
-    
-    // Start display tasks
-    lcd_start_tasks();
-    
-    // Create display update task
-    xTaskCreate(update_display_task, "update_display", 4096, NULL, 4, NULL);
 
+    ui_init();
+   
+   
+    // Start display tasks
+    //lcd_start_tasks();
+    
     // Main task can now sleep
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(100));

@@ -1,6 +1,6 @@
 idf_component_register(
-    SRCS "main.c" "spp_client_demo.c" "adc.c" "lcd.c"
-    INCLUDE_DIRS "."
+    SRCS "main.c" "spp_client_demo.c" "adc.c" "lcd.c" 
+    INCLUDE_DIRS "." "../components/squareline"
     REQUIRES driver 
             nvs_flash 
             bt
@@ -8,4 +8,5 @@ idf_component_register(
             spi_flash
             esp_lcd
             lvgl
+            squareline
 )

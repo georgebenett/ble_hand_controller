@@ -5,6 +5,8 @@
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "ui.h"
+
 
 static const char *TAG = "LCD";
 
