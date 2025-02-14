@@ -72,7 +72,7 @@ void app_main(void)
 
     // Initialize ADC and start tasks
     ESP_ERROR_CHECK(adc_init());
-    ESP_ERROR_CHECK(adc_start_task());
+    adc_start_task();
 
     // Wait for ADC calibration
     while (!adc_is_calibrated()) {

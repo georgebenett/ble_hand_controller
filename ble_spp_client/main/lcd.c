@@ -42,7 +42,7 @@ static void lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t 
     int offsetx2 = area->x2;
     int offsety1 = area->y1;
     int offsety2 = area->y2;
-    
+
     // copy a buffer's content to a specific area of the display
     esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
 }
@@ -230,13 +230,24 @@ esp_err_t display_init(void)
     ESP_LOGI(TAG, "Initialize LVGL library");
     lv_init();
 
-    // alloc draw buffers used by LVGL
+    // Try to allocate buffers in DMA memory first
     lv_color_t *buf1 = heap_caps_malloc(EXAMPLE_LCD_H_RES * EXAMPLE_LVGL_BUF_HEIGHT * sizeof(lv_color_t), MALLOC_CAP_DMA);
-    assert(buf1);
-    //lv_color_t *buf2 = heap_caps_malloc(EXAMPLE_LCD_H_RES * EXAMPLE_LVGL_BUF_HEIGHT * sizeof(lv_color_t), MALLOC_CAP_DMA);
-    //assert(buf2); //TODO: fix this later
-    
-    lv_disp_draw_buf_init(&disp_buf, buf1, NULL, EXAMPLE_LCD_H_RES * EXAMPLE_LVGL_BUF_HEIGHT);
+    lv_color_t *buf2 = NULL;
+
+    if (buf1) {
+        // First buffer in DMA successful, try second buffer in DMA
+        buf2 = heap_caps_malloc(EXAMPLE_LCD_H_RES * EXAMPLE_LVGL_BUF_HEIGHT * sizeof(lv_color_t), MALLOC_CAP_DMA);
+        ESP_LOGI(TAG, "Both buffers allocated in DMA memory");
+    } else {
+        // If DMA allocation failed, try SPIRAM
+        buf1 = heap_caps_malloc(EXAMPLE_LCD_H_RES * EXAMPLE_LVGL_BUF_HEIGHT * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+        assert(buf1);
+        buf2 = heap_caps_malloc(EXAMPLE_LCD_H_RES * EXAMPLE_LVGL_BUF_HEIGHT * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+        assert(buf2);
+        ESP_LOGW(TAG, "Buffers allocated in SPIRAM - performance may be reduced");
+    }
+
+    lv_disp_draw_buf_init(&disp_buf, buf1, buf2, EXAMPLE_LCD_H_RES * EXAMPLE_LVGL_BUF_HEIGHT);
 
     ESP_LOGI(TAG, "Register display driver to LVGL");
     lv_disp_drv_init(&disp_drv);
@@ -247,6 +258,7 @@ esp_err_t display_init(void)
     disp_drv.drv_update_cb = lvgl_update_cb;
     disp_drv.draw_buf = &disp_buf;
     disp_drv.user_data = panel_handle;
+    disp_drv.full_refresh = 1;  // Enable full refresh mode
     lv_disp_t *disp = lv_disp_drv_register(&disp_drv);
 
     // Create and start a periodic timer interrupt to call lv_tick_inc
@@ -291,4 +303,13 @@ void display_unlock(void)
 {
     assert(lvgl_mux && "display_init must be called first");
     xSemaphoreGive(lvgl_mux);
+}
+
+void wake_up_display(void) {
+    // Force a full screen refresh
+    if (display_lock(-1)) {
+        lv_obj_invalidate(lv_scr_act());
+        lv_refr_now(NULL);  // Force immediate refresh
+        display_unlock();
+    }
 }
