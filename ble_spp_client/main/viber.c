@@ -8,7 +8,7 @@
 #define TAG "VIBER"
 
 // Predefined pattern durations (in ms)
-#define SHORT_DURATION 100
+#define SHORT_DURATION 60
 #define LONG_DURATION  300
 #define PAUSE_DURATION 100
 

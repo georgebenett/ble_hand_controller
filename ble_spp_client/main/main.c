@@ -89,17 +89,20 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing display");
     ESP_ERROR_CHECK(display_init());
 
-    viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
+    vTaskDelay(pdMS_TO_TICKS(50));
 
     ui_init();
+
+    vTaskDelay(pdMS_TO_TICKS(50));
+
     lv_disp_load_scr(ui_splash_screen);
-    lv_timer_t *splash_timer = lv_timer_create(splash_timer_cb, 2000, NULL);
+    lv_timer_t *splash_timer = lv_timer_create(splash_timer_cb, 3000, NULL);
     lv_timer_set_repeat_count(splash_timer, 1);
-
-
 
        // Start button monitoring
     sleep_start_monitoring();
+
+    viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
 
     // Keep main task alive with minimal CPU usage
     while(1) {
