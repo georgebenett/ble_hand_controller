@@ -24,7 +24,7 @@ Alternatively, you can create `idf_component.yml`. More is in [Espressif's docum
 
 ```c
     ESP_LOGI(TAG, "Initialize SPI bus");
-    const esp_lcd_panel_io_spi_config_t io_config = SH8601_PANEL_BUS_QSPI_CONFIG(EXAMPLE_PIN_NUM_LCD_PCLK,
+    const esp_lcd_panel_io_spi_config_t io_config = SH8601_PANEL_BUS_QSPI_CONFIG(LCD_PCLK,
                                                                                  EXAMPLE_PIN_NUM_LCD_DATA0,
                                                                                  EXAMPLE_PIN_NUM_LCD_DATA1,
                                                                                  EXAMPLE_PIN_NUM_LCD_DATA2,
@@ -76,7 +76,7 @@ Alternatively, you can create `idf_component.yml`. More is in [Espressif's docum
 
 ```c
     ESP_LOGI(TAG, "Initialize QSPI bus");
-    const esp_lcd_panel_io_spi_config_t io_config = SH8601_PANEL_BUS_QSPI_CONFIG(EXAMPLE_PIN_NUM_LCD_PCLK,
+    const esp_lcd_panel_io_spi_config_t io_config = SH8601_PANEL_BUS_QSPI_CONFIG(LCD_PCLK,
                                                                                  EXAMPLE_PIN_NUM_LCD_DATA0,
                                                                                  EXAMPLE_PIN_NUM_LCD_DATA1,
                                                                                  EXAMPLE_PIN_NUM_LCD_DATA2,
