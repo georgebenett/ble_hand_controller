@@ -41,12 +41,11 @@ void init_system_mutexes(void) {
     }
 }
 
-// Add this function before app_main()
+
 static void splash_timer_cb(lv_timer_t * timer) {
     // Switch from splash screen to home screen
     lv_disp_load_scr(ui_home_screen);
-    
-    // Optional: Delete the timer since we only need it once
+    //Delete the timer since we only need it once
     if (timer != NULL) {
         lv_timer_del(timer);
     }
@@ -73,7 +72,7 @@ void app_main(void)
 
     // Initialize ADC and start tasks
     ESP_ERROR_CHECK(adc_init());
-    adc_start_task();
+    ESP_ERROR_CHECK(adc_start_task());
 
     // Wait for ADC calibration
     while (!adc_is_calibrated()) {
