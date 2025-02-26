@@ -15,6 +15,8 @@ idf_component_register(
         "lcd.c"
         "viber.c"
         "hw_config.c"
+        "lis3dhtr.c"
+        "battery.c"
         ${UI_SOURCES}
     INCLUDE_DIRS
         "."

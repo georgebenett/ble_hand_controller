@@ -12,8 +12,10 @@
 #define HALL_SENSOR_VDD_PIN      GPIO_NUM_14
 
 /* Battery Configuration */
-#define BATTERY_ADC_CHANNEL      ADC_CHANNEL_3
+#define BATTERY_VOLTAGE_PIN      GPIO_NUM_4
+#define BATTERY_ADC_CHANNEL      ADC_CHANNEL_3  // For GPIO 4
 #define BATTERY_CHARGING_PIN     GPIO_NUM_3
+#define BATTERY_CHARGING_STATUS_PIN GPIO_NUM_45
 
 /* Viber configuration */
 #define VIBER_PIN                GPIO_NUM_46
@@ -21,5 +23,11 @@
 /* Button Configuration */
 #define MAIN_BUTTON_GPIO GPIO_NUM_8
 
+/* I2C Configuration */
+#define I2C_MASTER_NUM          I2C_NUM_1
+#define I2C_MASTER_SDA_IO       GPIO_NUM_47
+#define I2C_MASTER_SCL_IO       GPIO_NUM_48
+#define I2C_MASTER_FREQ_HZ      100000
+#define LIS3DHTR_INT1_PIN       GPIO_NUM_21
 
 #endif // HW_CONFIG_H

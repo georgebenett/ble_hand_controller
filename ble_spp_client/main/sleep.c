@@ -137,32 +137,20 @@ void sleep_check_inactivity(bool is_ble_connected)
 }
 
 void enter_deep_sleep(void) {
-
     // Disable task watchdog (only if it was enabled)
     #if CONFIG_ESP_TASK_WDT_EN
         esp_task_wdt_deinit();
     #endif
 
-    // Power down Hall sensor
-    gpio_set_level(HALL_SENSOR_VDD_PIN, 0);
+    // Configure accelerometer INT1 pin for wake-up
+    rtc_gpio_init(LIS3DHTR_INT1_PIN);
+    rtc_gpio_set_direction(LIS3DHTR_INT1_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_dis(LIS3DHTR_INT1_PIN);
+    rtc_gpio_pulldown_en(LIS3DHTR_INT1_PIN);
+    rtc_gpio_hold_en(LIS3DHTR_INT1_PIN);
 
-    // Configure RTC GPIO for wake-up
-    rtc_gpio_init(MAIN_BUTTON_GPIO);
-    rtc_gpio_set_direction(MAIN_BUTTON_GPIO, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(MAIN_BUTTON_GPIO);
-    rtc_gpio_pulldown_dis(MAIN_BUTTON_GPIO);
-    rtc_gpio_hold_en(MAIN_BUTTON_GPIO);
-
-
-    while (gpio_get_level(MAIN_BUTTON_GPIO) == 0) { //wait for button to be released
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-
-    // Add debounce delay after release
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    // Enable wake-up on low level (button press)
-    ESP_ERROR_CHECK(esp_sleep_enable_ext0_wakeup(MAIN_BUTTON_GPIO, 0));
+    // Enable wake-up on high level (accelerometer interrupt)
+    ESP_ERROR_CHECK(esp_sleep_enable_ext0_wakeup(LIS3DHTR_INT1_PIN, 1));
 
     // Enter deep sleep
     ESP_LOGI(TAG, "Entering deep sleep");

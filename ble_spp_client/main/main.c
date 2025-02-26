@@ -15,9 +15,11 @@
 #include "main.h"
 #include "viber.h"
 #include "hw_config.h"
+#include "lis3dhtr.h"
+#include "battery.h"
 
 #define TAG "MAIN"
-#define LVGL_TASK_PRIORITY        6
+
 #define BLE_TASK_PRIORITY         9
 #define ADC_TASK_PRIORITY         10
 #define DISPLAY_UPDATE_PRIORITY   5
@@ -86,6 +88,10 @@ void app_main(void)
     // Initialize Viber
     ESP_ERROR_CHECK(viber_init());
 
+    // Initialize battery monitoring
+    ESP_ERROR_CHECK(battery_init());
+    battery_start_monitoring();
+
     ESP_LOGI(TAG, "Initializing display");
     ESP_ERROR_CHECK(display_init());
 
@@ -103,6 +109,15 @@ void app_main(void)
     sleep_start_monitoring();
 
     viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
+
+  // Initialize accelerometer
+    ret = lis3dhtr_init();
+    if (ret == ESP_ERR_NOT_FOUND) {
+        ESP_LOGW(TAG, "Accelerometer not found - continuing without accelerometer functionality");
+    } else if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Accelerometer initialization failed with error %d", ret);
+    }
+    xTaskCreate(lis3dhtr_task, "lis3dhtr_task", 4096, NULL, 5, NULL);
 
     // Keep main task alive with minimal CPU usage
     while(1) {
