@@ -154,5 +154,10 @@ void enter_deep_sleep(void) {
 
     // Enter deep sleep
     ESP_LOGI(TAG, "Entering deep sleep");
+
+    // Play sleep pattern
+    viber_play_pattern(VIBER_PATTERN_DOUBLE_SHORT);
+    vTaskDelay(pdMS_TO_TICKS(250));  // Wait for vibration to complete
+
     esp_deep_sleep_start();
 }

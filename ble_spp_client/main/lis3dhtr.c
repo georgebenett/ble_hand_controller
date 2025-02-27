@@ -147,7 +147,7 @@ esp_err_t lis3dhtr_init(void)
     }
 
     // Set interrupt threshold (adjust this value based on sensitivity needed)
-    ret = write_register(LIS3DHTR_REG_INT1_THS, 0x20);  // Threshold about 0.5g
+    ret = write_register(LIS3DHTR_REG_INT1_THS, 0x40);  // Threshold about 1g
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write INT1_THS: %d", ret);
         return ret;
