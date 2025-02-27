@@ -3,7 +3,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
-
+#include "viber.h"
 static const char *TAG = "TP Button";
 
 static QueueHandle_t que_touch = NULL;
@@ -61,6 +61,7 @@ static void tp_read_task(void *pvParameter)
         if (xQueueReceive(que_touch, &evt, portMAX_DELAY)) {
             if (evt.intr_mask & TOUCH_PAD_INTR_MASK_ACTIVE) {
                 ESP_LOGI(TAG, "TouchPad[%"PRIu32"] is pressed", evt.pad_num);
+                viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
             }
             if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
                 ESP_LOGI(TAG, "TouchPad[%"PRIu32"] is released", evt.pad_num);
