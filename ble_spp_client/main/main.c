@@ -17,6 +17,7 @@
 #include "hw_config.h"
 #include "lis3dhtr.h"
 #include "battery.h"
+#include "tp_button.h"
 
 #define TAG "MAIN"
 
@@ -94,6 +95,9 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Initializing display");
     ESP_ERROR_CHECK(display_init());
+
+    // Initialize touch buttons
+    ESP_ERROR_CHECK(tp_button_init());
 
     vTaskDelay(pdMS_TO_TICKS(50));
 

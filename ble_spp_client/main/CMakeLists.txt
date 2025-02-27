@@ -17,6 +17,7 @@ idf_component_register(
         "hw_config.c"
         "lis3dhtr.c"
         "battery.c"
+        "tp_button.c"
         ${UI_SOURCES}
     INCLUDE_DIRS
         "."
