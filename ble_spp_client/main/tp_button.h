@@ -9,4 +9,4 @@
 #define TP_BUTTON_DENOISE_ENABLE    1
 #define TP_BUTTON_CHANGE_CONFIG     0
 
-esp_err_t tp_button_init(void); 
+esp_err_t tp_button_init(void);

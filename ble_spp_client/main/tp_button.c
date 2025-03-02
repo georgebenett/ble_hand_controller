@@ -4,6 +4,8 @@
 #include "freertos/queue.h"
 #include "esp_log.h"
 #include "viber.h"
+#include "sleep.h"
+
 static const char *TAG = "TP Button";
 
 static QueueHandle_t que_touch = NULL;
@@ -33,6 +35,10 @@ static void touchsensor_interrupt_cb(void *arg)
     evt.pad_status = touch_pad_get_status();
     evt.pad_num = touch_pad_get_current_meas_channel();
 
+    if (evt.intr_mask & TOUCH_PAD_INTR_MASK_ACTIVE) {
+        sleep_reset_inactivity_timer();
+    }
+
     xQueueSendFromISR(que_touch, &evt, &task_awoken);
     if (task_awoken == pdTRUE) {
         portYIELD_FROM_ISR();
@@ -45,7 +51,7 @@ static void tp_set_thresholds(void)
     for (int i = 0; i < TP_BUTTON_NUM; i++) {
         touch_pad_read_benchmark(button[i], &touch_value);
         touch_pad_set_thresh(button[i], touch_value * button_threshold[i]);
-        ESP_LOGI(TAG, "touch pad [%d] base %"PRIu32", thresh %"PRIu32, 
+        ESP_LOGI(TAG, "touch pad [%d] base %"PRIu32", thresh %"PRIu32,
                  button[i], touch_value, (uint32_t)(touch_value * button_threshold[i]));
     }
 }
@@ -53,7 +59,7 @@ static void tp_set_thresholds(void)
 static void tp_read_task(void *pvParameter)
 {
     touch_event_t evt = {0};
-    
+
     vTaskDelay(50 / portTICK_PERIOD_MS);
     tp_set_thresholds();
 
@@ -77,14 +83,14 @@ static void tp_read_task(void *pvParameter)
 esp_err_t tp_button_init(void)
 {
     ESP_LOGI(TAG, "Initializing touch pad buttons");
-    
+
     que_touch = xQueueCreate(TP_BUTTON_NUM, sizeof(touch_event_t));
     if (que_touch == NULL) {
         return ESP_ERR_NO_MEM;
     }
 
     ESP_ERROR_CHECK(touch_pad_init());
-    
+
     // Initialize touch pads
     for (int i = 0; i < TP_BUTTON_NUM; i++) {
         ESP_ERROR_CHECK(touch_pad_config(button[i]));
@@ -100,11 +106,11 @@ esp_err_t tp_button_init(void)
     };
     ESP_ERROR_CHECK(touch_pad_filter_set_config(&filter_info));
     ESP_ERROR_CHECK(touch_pad_filter_enable());
-    
+
     // Register touch interrupt
     ESP_ERROR_CHECK(touch_pad_isr_register(touchsensor_interrupt_cb, NULL, TOUCH_PAD_INTR_MASK_ALL));
-    ESP_ERROR_CHECK(touch_pad_intr_enable(TOUCH_PAD_INTR_MASK_ACTIVE | 
-                                        TOUCH_PAD_INTR_MASK_INACTIVE | 
+    ESP_ERROR_CHECK(touch_pad_intr_enable(TOUCH_PAD_INTR_MASK_ACTIVE |
+                                        TOUCH_PAD_INTR_MASK_INACTIVE |
                                         TOUCH_PAD_INTR_MASK_TIMEOUT));
 
     // Start FSM timer
@@ -115,4 +121,4 @@ esp_err_t tp_button_init(void)
     xTaskCreate(&tp_read_task, "tp_read_task", 4096, NULL, 5, NULL);
 
     return ESP_OK;
-} 
+}
