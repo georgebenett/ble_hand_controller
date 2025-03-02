@@ -42,11 +42,11 @@ static esp_err_t write_register(uint8_t reg, uint8_t value)
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
         return ESP_ERR_TIMEOUT;
     }
-    
-    esp_err_t ret = i2c_master_write_to_device(I2C_MASTER_NUM, LIS3DHTR_I2C_ADDR, 
-                                             (uint8_t[]){reg, value}, 2, 
+
+    esp_err_t ret = i2c_master_write_to_device(I2C_MASTER_NUM, LIS3DHTR_I2C_ADDR,
+                                             (uint8_t[]){reg, value}, 2,
                                              pdMS_TO_TICKS(10));
-    
+
     xSemaphoreGive(i2c_mutex);
     return ret;
 }
@@ -57,11 +57,11 @@ static esp_err_t read_register(uint8_t reg, uint8_t *data)
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
         return ESP_ERR_TIMEOUT;
     }
-    
+
     esp_err_t ret = i2c_master_write_read_device(I2C_MASTER_NUM, LIS3DHTR_I2C_ADDR,
                                                 &reg, 1, data, 1,
                                                 pdMS_TO_TICKS(10));
-    
+
     xSemaphoreGive(i2c_mutex);
     return ret;
 }
@@ -69,6 +69,8 @@ static esp_err_t read_register(uint8_t reg, uint8_t *data)
 esp_err_t lis3dhtr_init(void)
 {
     esp_err_t ret;
+    int retry_count = 0;
+    const int MAX_RETRIES = 3;
 
     // Create mutex for I2C access
     i2c_mutex = xSemaphoreCreateMutex();
@@ -77,91 +79,81 @@ esp_err_t lis3dhtr_init(void)
         return ESP_ERR_NO_MEM;
     }
 
-    // Initialize I2C
-    ret = i2c_master_init();
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to initialize I2C: %d - continuing without accelerometer", ret);
-        return ESP_ERR_NOT_FOUND;
-    }
+    do {
+        // Initialize I2C
+        ret = i2c_master_init();
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to initialize I2C (attempt %d): %d", retry_count + 1, ret);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            retry_count++;
+            continue;
+        }
 
-    // Configure INT1 pin
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << LIS3DHTR_INT1_PIN),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .intr_type = GPIO_INTR_POSEDGE,
-    };
-    ret = gpio_config(&io_conf);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure GPIO: %d", ret);
-        return ret;
-    }
+        // Add a delay after I2C initialization
+        vTaskDelay(pdMS_TO_TICKS(100));
 
-    // Add a small delay after I2C initialization
-    vTaskDelay(pdMS_TO_TICKS(100));
+        // Test communication by reading WHO_AM_I register with retries
+        uint8_t who_am_i;
+        int who_am_i_retries = 3;
+        bool who_am_i_success = false;
 
-    // Test communication by reading WHO_AM_I register
-    uint8_t who_am_i;
-    ret = read_register(LIS3DHTR_REG_WHO_AM_I, &who_am_i);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to read WHO_AM_I register: %d - accelerometer not found", ret);
-        return ESP_ERR_NOT_FOUND;
-    }
-    
-    if (who_am_i != LIS3DHTR_WHO_AM_I_VALUE) {
-        ESP_LOGW(TAG, "Invalid WHO_AM_I value: 0x%02x - accelerometer not found", who_am_i);
-        return ESP_ERR_NOT_FOUND;
-    }
+        while (who_am_i_retries--) {
+            ret = read_register(LIS3DHTR_REG_WHO_AM_I, &who_am_i);
+            if (ret == ESP_OK && who_am_i == LIS3DHTR_WHO_AM_I_VALUE) {
+                who_am_i_success = true;
+                break;
+            }
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
 
-    // Initialize accelerometer
-    // Enable all axes, normal mode
-    ret = write_register(LIS3DHTR_REG_CTRL1, 0x97); // ODR=100Hz, all axes enabled
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write CTRL1: %d", ret);
-        return ret;
-    }
+        if (!who_am_i_success) {
+            ESP_LOGW(TAG, "Failed to verify WHO_AM_I (attempt %d)", retry_count + 1);
+            retry_count++;
+            continue;
+        }
 
-    // High-resolution mode (0x08) + range setting:
-    // ±2g  = 0x00
-    // ±4g  = 0x10
-    // ±8g  = 0x20
-    // ±16g = 0x30
-    ret = write_register(LIS3DHTR_REG_CTRL4, 0x18); // 0x08 | 0x10 for ±4g range
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write CTRL4: %d", ret);
-        return ret;
-    }
+        // Initialize accelerometer with verification
+        // Enable all axes, normal mode
+        ret = write_register(LIS3DHTR_REG_CTRL1, 0x97);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to write CTRL1 (attempt %d)", retry_count + 1);
+            retry_count++;
+            continue;
+        }
 
-    // Configure wake-up detection
-    ret = write_register(LIS3DHTR_REG_CTRL3, 0x40);  // AOI1 interrupt on INT1
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write CTRL3: %d", ret);
-        return ret;
-    }
+        // Verify CTRL1 write
+        uint8_t ctrl1_verify;
+        ret = read_register(LIS3DHTR_REG_CTRL1, &ctrl1_verify);
+        if (ret != ESP_OK || ctrl1_verify != 0x97) {
+            ESP_LOGW(TAG, "CTRL1 verification failed (attempt %d)", retry_count + 1);
+            retry_count++;
+            continue;
+        }
 
-    // Configure interrupt 1 source
-    ret = write_register(LIS3DHTR_REG_INT1_CFG, 0x2A);  // Enable XYZ high events
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write INT1_CFG: %d", ret);
-        return ret;
-    }
+        // High-resolution mode + ±4g range
+        ret = write_register(LIS3DHTR_REG_CTRL4, 0x18);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to write CTRL4 (attempt %d)", retry_count + 1);
+            retry_count++;
+            continue;
+        }
 
-    // Set interrupt threshold (adjust this value based on sensitivity needed)
-    ret = write_register(LIS3DHTR_REG_INT1_THS, 0x40);  // Threshold about 1g
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write INT1_THS: %d", ret);
-        return ret;
-    }
+        // Verify CTRL4 write
+        uint8_t ctrl4_verify;
+        ret = read_register(LIS3DHTR_REG_CTRL4, &ctrl4_verify);
+        if (ret != ESP_OK || ctrl4_verify != 0x18) {
+            ESP_LOGW(TAG, "CTRL4 verification failed (attempt %d)", retry_count + 1);
+            retry_count++;
+            continue;
+        }
 
-    // Set interrupt duration
-    ret = write_register(LIS3DHTR_REG_INT1_DURATION, 0x00);  // Minimum duration
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write INT1_DURATION: %d", ret);
-        return ret;
-    }
+        ESP_LOGI(TAG, "Accelerometer initialized successfully");
+        return ESP_OK;
 
-    ESP_LOGI(TAG, "LIS3DHTR initialized successfully");
-    return ESP_OK;
+    } while (retry_count < MAX_RETRIES);
+
+    ESP_LOGE(TAG, "Failed to initialize accelerometer after %d attempts", MAX_RETRIES);
+    return ESP_ERR_NOT_FOUND;
 }
 
 static esp_err_t read_registers(uint8_t reg, uint8_t *data, uint8_t len)
@@ -169,11 +161,11 @@ static esp_err_t read_registers(uint8_t reg, uint8_t *data, uint8_t len)
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
         return ESP_ERR_TIMEOUT;
     }
-    
+
     esp_err_t ret = i2c_master_write_read_device(I2C_MASTER_NUM, LIS3DHTR_I2C_ADDR,
                                                 &reg, 1, data, len,
                                                 pdMS_TO_TICKS(10));
-    
+
     xSemaphoreGive(i2c_mutex);
     return ret;
 }
@@ -184,7 +176,7 @@ esp_err_t lis3dhtr_read_acc(lis3dhtr_data_t *data)
     uint8_t raw_data[6];
     const int NUM_SAMPLES = 5;  // Number of samples to average
     float x_sum = 0, y_sum = 0, z_sum = 0;
-    
+
     for(int i = 0; i < NUM_SAMPLES; i++) {
         ret = read_registers(LIS3DHTR_REG_OUT_X_L, raw_data, 6);
         if (ret != ESP_OK) {
@@ -200,7 +192,7 @@ esp_err_t lis3dhtr_read_acc(lis3dhtr_data_t *data)
         x_sum += x * SENSITIVITY_4G;
         y_sum += y * SENSITIVITY_4G;
         z_sum += z * SENSITIVITY_4G;
-        
+
         vTaskDelay(pdMS_TO_TICKS(2));  // Small delay between readings
     }
 
@@ -218,7 +210,7 @@ void lis3dhtr_task(void *pvParameters)
 
     while (1) {
         lis3dhtr_read_acc(&data);
-        
+
         /*if (ret == ESP_OK) {
             ESP_LOGI(TAG, "X: %.2f g, Y: %.2f g, Z: %.2f g", data.x, data.y, data.z);
         } else {

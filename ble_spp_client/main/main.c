@@ -134,14 +134,29 @@ void app_main(void)
 
     viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
 
-  // Initialize accelerometer
-    ret = lis3dhtr_init();
+    // Initialize accelerometer with retries
+    ret = ESP_ERR_NOT_FOUND;
+    int acc_retry_count = 0;
+    const int MAX_ACC_RETRIES = 3;
+
+    do {
+        ret = lis3dhtr_init();
+        if (ret == ESP_ERR_NOT_FOUND) {
+            ESP_LOGW(TAG, "Accelerometer initialization failed, retry %d", acc_retry_count + 1);
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+        acc_retry_count++;
+    } while (ret == ESP_ERR_NOT_FOUND && acc_retry_count < MAX_ACC_RETRIES);
+
     if (ret == ESP_ERR_NOT_FOUND) {
-        ESP_LOGW(TAG, "Accelerometer not found - continuing without accelerometer functionality");
+        ESP_LOGW(TAG, "Accelerometer not found after %d retries - continuing without accelerometer", MAX_ACC_RETRIES);
     } else if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Accelerometer initialization failed with error %d", ret);
     }
-    xTaskCreate(lis3dhtr_task, "lis3dhtr_task", 4096, NULL, 5, NULL);
+
+    if (ret == ESP_OK) {
+        xTaskCreate(lis3dhtr_task, "lis3dhtr_task", 4096, NULL, 5, NULL);
+    }
 
     // Keep main task alive with minimal CPU usage
     while(1) {
