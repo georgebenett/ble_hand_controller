@@ -26,6 +26,9 @@ static const float button_threshold[TP_BUTTON_NUM] = {
     0.01
 };
 
+static int active_buttons = 0;
+static bool buttons_active = false;
+
 static void touchsensor_interrupt_cb(void *arg)
 {
     int task_awoken = pdFALSE;
@@ -36,7 +39,11 @@ static void touchsensor_interrupt_cb(void *arg)
     evt.pad_num = touch_pad_get_current_meas_channel();
 
     if (evt.intr_mask & TOUCH_PAD_INTR_MASK_ACTIVE) {
-        sleep_reset_inactivity_timer();
+        active_buttons++;
+    } else if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
+        if (active_buttons > 0) {
+            active_buttons--;
+        }
     }
 
     xQueueSendFromISR(que_touch, &evt, &task_awoken);
@@ -66,17 +73,22 @@ static void tp_read_task(void *pvParameter)
     while (1) {
         if (xQueueReceive(que_touch, &evt, portMAX_DELAY)) {
             if (evt.intr_mask & TOUCH_PAD_INTR_MASK_ACTIVE) {
-                ESP_LOGI(TAG, "TouchPad[%"PRIu32"] is pressed", evt.pad_num);
-                viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
-            }
-            if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
-                ESP_LOGI(TAG, "TouchPad[%"PRIu32"] is released", evt.pad_num);
-            }
-            if (evt.intr_mask & TOUCH_PAD_INTR_MASK_TIMEOUT) {
-                ESP_LOGI(TAG, "TouchPad[%"PRIu32"] timeout", evt.pad_num);
-                touch_pad_timeout_resume();
+                //ESP_LOGI(TAG, "TouchPad[%"PRIu32"] pressed, active: %d", evt.pad_num, active_buttons);
+
+                // Activate immediately when both buttons are pressed
+                if (active_buttons == TP_BUTTON_NUM) {
+                    buttons_active = true;
+                    viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
+                    //ESP_LOGI(TAG, "Both buttons pressed - activated");
+                }
+            } else if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
+                //ESP_LOGI(TAG, "TouchPad[%"PRIu32"] released, active: %d", evt.pad_num, active_buttons);
+                // Deactivate immediately when any button is released
+                buttons_active = false;
+                //ESP_LOGI(TAG, "Button released - deactivated");
             }
         }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -121,4 +133,8 @@ esp_err_t tp_button_init(void)
     xTaskCreate(&tp_read_task, "tp_read_task", 4096, NULL, 5, NULL);
 
     return ESP_OK;
+}
+
+bool tp_button_is_active(void) {
+    return buttons_active;
 }

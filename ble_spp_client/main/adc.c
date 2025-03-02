@@ -11,7 +11,7 @@
 #include "sleep.h"
 #include "ble_spp_client.h"
 #include "hw_config.h"
-
+#include "tp_button.h"
 
 
 static const char *TAG = "ADC";
@@ -101,36 +101,42 @@ int32_t adc_read_value(void)
 
 static void adc_task(void *pvParameters) {
     uint32_t last_value = 0;
-    const uint32_t CHANGE_THRESHOLD = 2; // Adjust this threshold as needed
+    const uint32_t CHANGE_THRESHOLD = 2;
+    const uint8_t NEUTRAL_VALUE = 127;
 
     while (1) {
         uint32_t adc_value = adc_read_value();
         if (adc_value == -1) {
             error_count++;
             if (error_count >= MAX_ERRORS) {
-                ESP_LOGE(TAG, "Too many ADC errors, attempting re-initialization");
                 adc_deinit();
                 vTaskDelay(pdMS_TO_TICKS(100));
                 if (adc_init() == ESP_OK) {
                     error_count = 0;
                 }
             }
-            vTaskDelay(pdMS_TO_TICKS(100));  // Wait before retry
+            vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
-        error_count = 0;  // Reset error count on successful read
+        error_count = 0;
 
         uint8_t mapped_value = map_adc_value(adc_value);
-        latest_adc_value = mapped_value;
-        if(!is_connect){
-            // Only monitor value changes and reset timer when BLE is not connected
-            if (abs((int32_t)mapped_value - (int32_t)last_value) > CHANGE_THRESHOLD) {
-                sleep_reset_inactivity_timer();
-                last_value = mapped_value;
+
+        if (tp_button_is_active()) {
+            latest_adc_value = mapped_value;
+            if (!is_connect) {
+                if (abs((int32_t)mapped_value - (int32_t)last_value) > CHANGE_THRESHOLD) {
+                    sleep_reset_inactivity_timer();
+                    last_value = mapped_value;
+                }
             }
+            xQueueSend(adc_display_queue, &mapped_value, 0);
+        } else {
+            latest_adc_value = NEUTRAL_VALUE;
+            last_value = NEUTRAL_VALUE;
+            xQueueSend(adc_display_queue, &NEUTRAL_VALUE, 0);
         }
 
-        xQueueSend(adc_display_queue, &mapped_value, 0);
         vTaskDelay(pdMS_TO_TICKS(ADC_SAMPLING_TICKS));
     }
 }
@@ -162,7 +168,7 @@ void adc_start_task(void) {
     }
 #endif
 
-    xTaskCreate(adc_task, "adc_task", 2048, NULL, 5, NULL);
+    xTaskCreate(adc_task, "adc_task", 4096, NULL, 5, NULL);
 }
 
 
