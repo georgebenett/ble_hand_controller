@@ -100,7 +100,24 @@ void app_main(void)
     ESP_ERROR_CHECK(display_init());
 
     // Initialize touch buttons
-    ESP_ERROR_CHECK(tp_button_init());
+    esp_err_t tp_ret;
+    int tp_retry_count = 0;
+    const int MAX_TP_RETRIES = 3;
+
+    do {
+        tp_ret = tp_button_init();
+        if (tp_ret != ESP_OK) {
+            ESP_LOGW(TAG, "Touch button initialization failed, retry %d", tp_retry_count + 1);
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+        tp_retry_count++;
+    } while (tp_ret != ESP_OK && tp_retry_count < MAX_TP_RETRIES);
+
+    if (tp_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Touch button initialization failed after %d retries", MAX_TP_RETRIES);
+        // Handle the error (maybe restart the device)
+        esp_restart();
+    }
 
     vTaskDelay(pdMS_TO_TICKS(50));
 

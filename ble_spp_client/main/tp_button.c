@@ -56,10 +56,17 @@ static void tp_set_thresholds(void)
 {
     uint32_t touch_value;
     for (int i = 0; i < TP_BUTTON_NUM; i++) {
+        // Add a small delay before reading
+        vTaskDelay(pdMS_TO_TICKS(20));
+
         touch_pad_read_benchmark(button[i], &touch_value);
         touch_pad_set_thresh(button[i], touch_value * button_threshold[i]);
-        ESP_LOGI(TAG, "touch pad [%d] base %"PRIu32", thresh %"PRIu32,
-                 button[i], touch_value, (uint32_t)(touch_value * button_threshold[i]));
+
+        // Only log the final calibrated values
+        if (touch_value < 4000000) {  // Only log reasonable values
+            ESP_LOGI(TAG, "Touch pad [%d] calibrated - base: %"PRIu32", threshold: %"PRIu32,
+                     button[i], touch_value, (uint32_t)(touch_value * button_threshold[i]));
+        }
     }
 }
 
@@ -102,22 +109,46 @@ esp_err_t tp_button_init(void)
     }
 
     ESP_ERROR_CHECK(touch_pad_init());
+    vTaskDelay(pdMS_TO_TICKS(100));
 
-    // Initialize touch pads
+    // Initialize touch pads without logging initial values
     for (int i = 0; i < TP_BUTTON_NUM; i++) {
         ESP_ERROR_CHECK(touch_pad_config(button[i]));
+
+        uint32_t touch_value;
+        int retry_count = 0;
+        const int MAX_RETRIES = 5;
+
+        while (retry_count < MAX_RETRIES) {
+            if (touch_pad_read_benchmark(button[i], &touch_value) == ESP_OK && touch_value > 0) {
+                break;
+            }
+            vTaskDelay(pdMS_TO_TICKS(50));
+            retry_count++;
+        }
+
+        if (retry_count >= MAX_RETRIES) {
+            ESP_LOGE(TAG, "Failed to initialize touch pad [%d]", button[i]);
+            return ESP_FAIL;
+        }
     }
 
-    // Filter setting
+    // Filter setting with more aggressive noise reduction
     touch_filter_config_t filter_info = {
-        .mode = TOUCH_PAD_FILTER_IIR_16,
-        .debounce_cnt = 1,
-        .noise_thr = 0,
+        .mode = TOUCH_PAD_FILTER_IIR_32,          // Increased from IIR_16
+        .debounce_cnt = 2,                        // Increased from 1
+        .noise_thr = 3,                           // Added noise threshold
         .jitter_step = 4,
-        .smh_lvl = TOUCH_PAD_SMOOTH_IIR_2,
+        .smh_lvl = TOUCH_PAD_SMOOTH_IIR_4,        // Increased from IIR_2
     };
     ESP_ERROR_CHECK(touch_pad_filter_set_config(&filter_info));
     ESP_ERROR_CHECK(touch_pad_filter_enable());
+
+    // Add delay before setting thresholds
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // Set and verify thresholds
+    tp_set_thresholds();
 
     // Register touch interrupt
     ESP_ERROR_CHECK(touch_pad_isr_register(touchsensor_interrupt_cb, NULL, TOUCH_PAD_INTR_MASK_ALL));
@@ -125,11 +156,9 @@ esp_err_t tp_button_init(void)
                                         TOUCH_PAD_INTR_MASK_INACTIVE |
                                         TOUCH_PAD_INTR_MASK_TIMEOUT));
 
-    // Start FSM timer
     ESP_ERROR_CHECK(touch_pad_set_fsm_mode(TOUCH_FSM_MODE_TIMER));
     ESP_ERROR_CHECK(touch_pad_fsm_start());
 
-    // Create touch pad reading task
     xTaskCreate(&tp_read_task, "tp_read_task", 4096, NULL, 5, NULL);
 
     return ESP_OK;
