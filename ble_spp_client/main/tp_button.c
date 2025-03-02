@@ -23,6 +23,7 @@ typedef struct touch_msg {
     uint32_t pad_num;
     uint32_t pad_status;
     uint32_t pad_val;
+    bool should_vibrate;  // New field to indicate vibration needed
 } touch_event_t;
 
 static const touch_pad_t button[TP_BUTTON_NUM] = {
@@ -41,7 +42,7 @@ static bool buttons_active = false;
 static void touchsensor_interrupt_cb(void *arg)
 {
     int task_awoken = pdFALSE;
-    touch_event_t evt;
+    touch_event_t evt = {0};
 
     evt.intr_mask = touch_pad_read_intr_status_mask();
     evt.pad_status = touch_pad_get_status();
@@ -49,17 +50,20 @@ static void touchsensor_interrupt_cb(void *arg)
 
     if (evt.intr_mask & TOUCH_PAD_INTR_MASK_ACTIVE) {
         active_buttons++;
-        // Only set active when we have both buttons pressed
-        buttons_active = (active_buttons >= TP_BUTTON_NUM);
+        if (active_buttons >= TP_BUTTON_NUM) {
+            buttons_active = true;
+            evt.should_vibrate = true;  // Request vibration
+        }
     } else if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
-        // Always deactivate first when any button is released
         buttons_active = false;
         if (active_buttons > 0) {
             active_buttons--;
         }
+        if (active_buttons == 0) {
+            evt.should_vibrate = true;  // Request vibration
+        }
     }
 
-    // Ensure active_buttons stays within bounds
     if (active_buttons > TP_BUTTON_NUM) {
         active_buttons = TP_BUTTON_NUM;
     }
@@ -144,7 +148,11 @@ static void tp_read_task(void *pvParameter)
     tp_set_thresholds();
 
     while (1) {
-        xQueueReceive(que_touch, &evt, portMAX_DELAY);
+        if (xQueueReceive(que_touch, &evt, portMAX_DELAY)) {
+            if (evt.should_vibrate) {
+                viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
+            }
+        }
     }
 }
 
