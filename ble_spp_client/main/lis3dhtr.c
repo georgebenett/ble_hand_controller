@@ -217,7 +217,7 @@ void lis3dhtr_task(void *pvParameters)
     TickType_t last_wake_time = xTaskGetTickCount();
 
     while (1) {
-        esp_err_t ret = lis3dhtr_read_acc(&data);
+        lis3dhtr_read_acc(&data);
         
         /*if (ret == ESP_OK) {
             ESP_LOGI(TAG, "X: %.2f g, Y: %.2f g, Z: %.2f g", data.x, data.y, data.z);

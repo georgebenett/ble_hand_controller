@@ -99,8 +99,6 @@ void sleep_init(void) {
     };
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
-    // Set initial state - power on the sensor
-    gpio_set_level(HALL_SENSOR_VDD_PIN, 1);  // VDD on
 
     ESP_ERROR_CHECK(button_init(&config));
     button_register_callback(sleep_button_callback, NULL);
@@ -141,6 +139,9 @@ void enter_deep_sleep(void) {
     #if CONFIG_ESP_TASK_WDT_EN
         esp_task_wdt_deinit();
     #endif
+
+    // Turn off hall sensor
+    gpio_set_level(HALL_SENSOR_VDD_PIN, 0);
 
     // Configure accelerometer INT1 pin for wake-up
     rtc_gpio_init(LIS3DHTR_INT1_PIN);

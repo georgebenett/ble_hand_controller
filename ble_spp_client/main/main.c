@@ -73,6 +73,9 @@ void app_main(void)
     // Initialize VESC configuration
     ESP_ERROR_CHECK(vesc_config_init());
 
+    // Turn on hall sensor
+    gpio_set_level(HALL_SENSOR_VDD_PIN, 1);
+
     // Initialize ADC and start tasks
     ESP_ERROR_CHECK(adc_init());
     adc_start_task();
