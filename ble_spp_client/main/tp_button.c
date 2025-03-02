@@ -52,15 +52,15 @@ static void touchsensor_interrupt_cb(void *arg)
         active_buttons++;
         if (active_buttons >= TP_BUTTON_NUM) {
             buttons_active = true;
-            evt.should_vibrate = true;  // Request vibration
+            evt.should_vibrate = true;  // Only vibrate when both buttons are pressed
         }
     } else if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
+        if (buttons_active) {  // Only vibrate if we're coming from an active state
+            evt.should_vibrate = true;
+        }
         buttons_active = false;
         if (active_buttons > 0) {
             active_buttons--;
-        }
-        if (active_buttons == 0) {
-            evt.should_vibrate = true;  // Request vibration
         }
     }
 
