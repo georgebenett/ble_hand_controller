@@ -5,8 +5,17 @@
 #include "esp_log.h"
 #include "viber.h"
 #include "sleep.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 
 static const char *TAG = "TP Button";
+
+// Function declarations
+static esp_err_t save_calibration_to_nvs(uint32_t *values);
+static esp_err_t load_calibration_from_nvs(uint32_t *values);
+static void tp_set_thresholds(void);
+static void touchsensor_interrupt_cb(void *arg);
+static void tp_read_task(void *pvParameter);
 
 static QueueHandle_t que_touch = NULL;
 typedef struct touch_msg {
@@ -40,10 +49,19 @@ static void touchsensor_interrupt_cb(void *arg)
 
     if (evt.intr_mask & TOUCH_PAD_INTR_MASK_ACTIVE) {
         active_buttons++;
+        // Only set active when we have both buttons pressed
+        buttons_active = (active_buttons >= TP_BUTTON_NUM);
     } else if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
+        // Always deactivate first when any button is released
+        buttons_active = false;
         if (active_buttons > 0) {
             active_buttons--;
         }
+    }
+
+    // Ensure active_buttons stays within bounds
+    if (active_buttons > TP_BUTTON_NUM) {
+        active_buttons = TP_BUTTON_NUM;
     }
 
     xQueueSendFromISR(que_touch, &evt, &task_awoken);
@@ -54,20 +72,68 @@ static void touchsensor_interrupt_cb(void *arg)
 
 static void tp_set_thresholds(void)
 {
-    uint32_t touch_value;
-    for (int i = 0; i < TP_BUTTON_NUM; i++) {
-        // Add a small delay before reading
-        vTaskDelay(pdMS_TO_TICKS(20));
+    uint32_t touch_values[TP_BUTTON_NUM];
+    uint32_t samples[TP_BUTTON_NUM][TP_CALIBRATION_SAMPLES];
 
-        touch_pad_read_benchmark(button[i], &touch_value);
-        touch_pad_set_thresh(button[i], touch_value * button_threshold[i]);
-
-        // Only log the final calibrated values
-        if (touch_value < 4000000) {  // Only log reasonable values
-            ESP_LOGI(TAG, "Touch pad [%d] calibrated - base: %"PRIu32", threshold: %"PRIu32,
-                     button[i], touch_value, (uint32_t)(touch_value * button_threshold[i]));
-        }
+#if CALIBRATE_TP
+    ESP_LOGI(TAG, "Force calibration flag set, performing calibration");
+    nvs_handle_t nvs_handle;
+    if (nvs_open(TP_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle) == ESP_OK) {
+        nvs_erase_key(nvs_handle, TP_NVS_KEY_CALIBRATED);
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
     }
+#else
+    if (load_calibration_from_nvs(touch_values) == ESP_OK) {
+        for (int i = 0; i < TP_BUTTON_NUM; i++) {
+            touch_pad_set_thresh(button[i], touch_values[i] * button_threshold[i]);
+            ESP_LOGI(TAG, "Touch pad [%d] loaded calibration - base: %"PRIu32", threshold: %"PRIu32,
+                     button[i], touch_values[i], (uint32_t)(touch_values[i] * button_threshold[i]));
+        }
+        return;
+    }
+#endif
+
+    // Perform calibration with multiple samples
+    ESP_LOGI(TAG, "Starting touch pad calibration process");
+    ESP_LOGI(TAG, "Please follow the calibration instructions:");
+
+    for (int sample = 0; sample < TP_CALIBRATION_SAMPLES; sample++) {
+        ESP_LOGI(TAG, "Sample %d/%d - Press and hold both buttons for %d ms",
+                 sample + 1, TP_CALIBRATION_SAMPLES, TP_CALIBRATION_HOLD_TIME_MS);
+
+        vTaskDelay(pdMS_TO_TICKS(TP_CALIBRATION_DELAY_MS));
+
+        // Take readings for each button
+        for (int i = 0; i < TP_BUTTON_NUM; i++) {
+            touch_pad_read_benchmark(button[i], &samples[i][sample]);
+            ESP_LOGI(TAG, "Button %d reading: %"PRIu32, button[i], samples[i][sample]);
+        }
+
+        // Indicate completion of this sample
+        viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
+    }
+
+    // Calculate average values
+    for (int i = 0; i < TP_BUTTON_NUM; i++) {
+        uint32_t sum = 0;
+        for (int sample = 0; sample < TP_CALIBRATION_SAMPLES; sample++) {
+            sum += samples[i][sample];
+        }
+        touch_values[i] = sum / TP_CALIBRATION_SAMPLES;
+
+        // Set thresholds using averaged values
+        touch_pad_set_thresh(button[i], touch_values[i] * button_threshold[i]);
+        ESP_LOGI(TAG, "Touch pad [%d] calibration complete - base: %"PRIu32", threshold: %"PRIu32,
+                 button[i], touch_values[i], (uint32_t)(touch_values[i] * button_threshold[i]));
+    }
+
+    // Save the calibration
+    save_calibration_to_nvs(touch_values);
+
+    // Indicate calibration completion
+    viber_play_pattern(VIBER_PATTERN_DOUBLE_SHORT);
+    ESP_LOGI(TAG, "Calibration complete!");
 }
 
 static void tp_read_task(void *pvParameter)
@@ -78,24 +144,7 @@ static void tp_read_task(void *pvParameter)
     tp_set_thresholds();
 
     while (1) {
-        if (xQueueReceive(que_touch, &evt, portMAX_DELAY)) {
-            if (evt.intr_mask & TOUCH_PAD_INTR_MASK_ACTIVE) {
-                //ESP_LOGI(TAG, "TouchPad[%"PRIu32"] pressed, active: %d", evt.pad_num, active_buttons);
-
-                // Activate immediately when both buttons are pressed
-                if (active_buttons == TP_BUTTON_NUM) {
-                    buttons_active = true;
-                    viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
-                    //ESP_LOGI(TAG, "Both buttons pressed - activated");
-                }
-            } else if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
-                //ESP_LOGI(TAG, "TouchPad[%"PRIu32"] released, active: %d", evt.pad_num, active_buttons);
-                // Deactivate immediately when any button is released
-                buttons_active = false;
-                //ESP_LOGI(TAG, "Button released - deactivated");
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        xQueueReceive(que_touch, &evt, portMAX_DELAY);
     }
 }
 
@@ -164,6 +213,72 @@ esp_err_t tp_button_init(void)
     return ESP_OK;
 }
 
-bool tp_button_is_active(void) {
-    return buttons_active;
+bool tp_button_is_active(void)
+{
+    return buttons_active && (active_buttons == TP_BUTTON_NUM);
+}
+
+static esp_err_t save_calibration_to_nvs(uint32_t *values) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+
+    err = nvs_open(TP_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Save calibration values
+    err = nvs_set_blob(nvs_handle, TP_NVS_KEY_VALUES, values, sizeof(uint32_t) * TP_BUTTON_NUM);
+    if (err != ESP_OK) {
+        nvs_close(nvs_handle);
+        return err;
+    }
+
+    // Set calibration flag
+    err = nvs_set_u8(nvs_handle, TP_NVS_KEY_CALIBRATED, 1);
+    if (err != ESP_OK) {
+        nvs_close(nvs_handle);
+        return err;
+    }
+
+    err = nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+    return err;
+}
+
+static esp_err_t load_calibration_from_nvs(uint32_t *values) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+
+    err = nvs_open(TP_NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Check if calibration exists
+    uint8_t is_calibrated = 0;
+    err = nvs_get_u8(nvs_handle, TP_NVS_KEY_CALIBRATED, &is_calibrated);
+    if (err != ESP_OK || !is_calibrated) {
+        nvs_close(nvs_handle);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Read calibration values
+    size_t required_size = sizeof(uint32_t) * TP_BUTTON_NUM;
+    err = nvs_get_blob(nvs_handle, TP_NVS_KEY_VALUES, values, &required_size);
+    nvs_close(nvs_handle);
+
+    return err;
+}
+
+esp_err_t tp_button_force_calibration(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(TP_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_erase_key(nvs_handle, TP_NVS_KEY_CALIBRATED);
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+    }
+    tp_set_thresholds();
+    return ESP_OK;
 }
