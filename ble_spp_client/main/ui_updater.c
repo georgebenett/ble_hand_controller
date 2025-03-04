@@ -61,6 +61,7 @@ static void gesture_test_cb(lv_event_t *e) {
     if (!gesture_test_enabled) return;
 
     lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());
+    lv_obj_t *current_screen = lv_scr_act();
 
     switch (dir) {
         case LV_DIR_LEFT:
@@ -71,9 +72,17 @@ static void gesture_test_cb(lv_event_t *e) {
             break;
         case LV_DIR_TOP:
             ESP_LOGI(TAG, "Gesture: SWIPE UP");
+            // If on shutdown screen, go back to home screen
+            if (current_screen == ui_shutdown_screen) {
+                lv_disp_load_scr(ui_home_screen);
+            }
             break;
         case LV_DIR_BOTTOM:
             ESP_LOGI(TAG, "Gesture: SWIPE DOWN");
+            // If on home screen, go to shutdown screen
+            if (current_screen == ui_home_screen) {
+                lv_disp_load_scr(ui_shutdown_screen);
+            }
             break;
         default:
             // Don't log anything for no gesture
@@ -84,7 +93,11 @@ static void gesture_test_cb(lv_event_t *e) {
 void ui_init_gesture_test(void) {
     // Add gesture event callback to home screen
     lv_obj_add_event_cb(ui_home_screen, gesture_test_cb, LV_EVENT_GESTURE, NULL);
-    ESP_LOGI(TAG, "Gesture test initialized");
+
+    // Also add gesture event callback to shutdown screen
+    lv_obj_add_event_cb(ui_shutdown_screen, gesture_test_cb, LV_EVENT_GESTURE, NULL);
+
+    ESP_LOGI(TAG, "Gesture test initialized on both screens");
 }
 
 void ui_enable_gesture_test(bool enable) {
@@ -122,11 +135,10 @@ void ui_handle_touch_event(lv_event_t * e) {
 }
 
 void ui_init_gesture_handling(void) {
-    // We'll still register the event handler for the home screen,
-    // but it will be empty and won't interfere with LVGL's gesture detection
-    lv_obj_add_event_cb(ui_home_screen, ui_handle_touch_event, LV_EVENT_ALL, NULL);
-
-    // Make sure the home screen can receive gestures
+    // Make sure both screens can receive gestures
     lv_obj_clear_flag(ui_home_screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_flag(ui_home_screen, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_clear_flag(ui_shutdown_screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_flag(ui_shutdown_screen, LV_OBJ_FLAG_CLICKABLE);
 }

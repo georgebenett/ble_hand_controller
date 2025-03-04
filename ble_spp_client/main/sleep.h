@@ -5,7 +5,7 @@
 #include "esp_sleep.h"
 
 
-#define INACTIVITY_TIMEOUT_MS 60000  // 1 minute
+#define INACTIVITY_TIMEOUT_MS 120000  // 2 minutes
 
 void sleep_init(void);
 void sleep_reset_inactivity_timer(void);
