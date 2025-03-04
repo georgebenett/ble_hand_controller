@@ -22,8 +22,8 @@ static const touch_pad_t button[TP_BUTTON_NUM] = {
 };
 
 static const float button_threshold[TP_BUTTON_NUM] = {
-    0.01,
-    0.01
+    0.008,
+    0.008
 };
 
 static int active_buttons = 0;
@@ -128,13 +128,13 @@ esp_err_t tp_button_init(void)
         }
     }
 
-    // Filter setting with more aggressive noise reduction
+    // Filter setting with better sensitivity
     touch_filter_config_t filter_info = {
-        .mode = TOUCH_PAD_FILTER_IIR_32,          // Increased from IIR_16
-        .debounce_cnt = 2,                        // Increased from 1
-        .noise_thr = 3,                           // Added noise threshold
-        .jitter_step = 4,
-        .smh_lvl = TOUCH_PAD_SMOOTH_IIR_4,        // Increased from IIR_2
+        .mode = TOUCH_PAD_FILTER_IIR_16,          // Reduced from IIR_32 for faster response
+        .debounce_cnt = 1,                        // Reduced from 2
+        .noise_thr = 2,                           // Reduced from 3
+        .jitter_step = 2,                         // Reduced from 4
+        .smh_lvl = TOUCH_PAD_SMOOTH_IIR_2,        // Reduced from IIR_4
     };
     ESP_ERROR_CHECK(touch_pad_filter_set_config(&filter_info));
     ESP_ERROR_CHECK(touch_pad_filter_enable());
