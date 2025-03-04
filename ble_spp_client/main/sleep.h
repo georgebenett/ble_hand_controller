@@ -5,7 +5,7 @@
 #include "esp_sleep.h"
 #include "button.h"
 
-#define INACTIVITY_TIMEOUT_MS 120000  // 8 seconds
+#define INACTIVITY_TIMEOUT_MS 60000  // 1 minute
 
 void sleep_init(void);
 void sleep_start_monitoring(void);

@@ -37,6 +37,12 @@
 #define SENSITIVITY_8G  0.000244f  // 0.244 mg/digit
 #define SENSITIVITY_16G 0.000732f  // 0.732 mg/digit
 
+// Shake detection parameters
+#define SHAKE_THRESHOLD_G    4.0f     // Increased from 3.0f
+#define SHAKE_DURATION_MS    100
+#define SHAKE_COOLDOWN_MS    1000
+#define SHAKE_CONSECUTIVE_SAMPLES 6    // Increased from 5
+#define SHAKE_RESET_THRESHOLD_G 3.5f   // Increased from 2.5f
 
 // Data structure for accelerometer readings
 typedef struct {
@@ -52,4 +58,4 @@ esp_err_t lis3dhtr_set_data_rate(uint8_t rate);
 esp_err_t lis3dhtr_enable_int1(bool enable);
 void lis3dhtr_task(void *pvParameters);
 
-#endif // LIS3DHTR_H 
+#endif // LIS3DHTR_H

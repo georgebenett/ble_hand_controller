@@ -80,19 +80,14 @@ static void tp_read_task(void *pvParameter)
     while (1) {
         if (xQueueReceive(que_touch, &evt, portMAX_DELAY)) {
             if (evt.intr_mask & TOUCH_PAD_INTR_MASK_ACTIVE) {
-                //ESP_LOGI(TAG, "TouchPad[%"PRIu32"] pressed, active: %d", evt.pad_num, active_buttons);
-
                 // Activate immediately when both buttons are pressed
                 if (active_buttons == TP_BUTTON_NUM) {
                     buttons_active = true;
                     viber_play_pattern(VIBER_PATTERN_SINGLE_SHORT);
-                    //ESP_LOGI(TAG, "Both buttons pressed - activated");
+                    sleep_reset_inactivity_timer();
                 }
             } else if (evt.intr_mask & TOUCH_PAD_INTR_MASK_INACTIVE) {
-                //ESP_LOGI(TAG, "TouchPad[%"PRIu32"] released, active: %d", evt.pad_num, active_buttons);
-                // Deactivate immediately when any button is released
                 buttons_active = false;
-                //ESP_LOGI(TAG, "Button released - deactivated");
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
