@@ -4,6 +4,7 @@
 #include "ble_spp_client.h"
 #include "ui/ui.h"
 #include "sleep.h"
+#include "elastic.h"
 
 #define TAG "UI_UPDATER"
 
@@ -148,53 +149,34 @@ void ui_init_gesture_handling(void) {
     lv_obj_add_flag(ui_shutdown_screen, LV_OBJ_FLAG_CLICKABLE);
 }
 
-// Modified function to handle the slider events
-static void turnoff_slider_event_cb(lv_event_t *e) {
-    lv_obj_t *slider = lv_event_get_target(e);
-    lv_event_code_t code = lv_event_get_code(e);
+// Add this function to handle elastic slider value changes
+static void turnoff_slider_value_changed_cb(int32_t value, void* user_data) {
+    ESP_LOGI("APP", "Slider value: %ld", value);
 
-    // Track if slider has reached 100
-    static bool slider_at_max = false;
-
-    if (code == LV_EVENT_PRESSED) {
-        // User started interacting with the slider
-        slider_at_max = false;
-    }
-    else if (code == LV_EVENT_VALUE_CHANGED) {
-        // While dragging, check if we've reached the maximum value
-        int32_t value = lv_slider_get_value(slider);
-
-        // Just track if we've reached max, but don't trigger shutdown yet
-        if (value >= 100) {
-            slider_at_max = true;
-        } else {
-            slider_at_max = false;
-        }
-    }
-    else if (code == LV_EVENT_RELEASED) {
-
-        // Only trigger shutdown if the slider was at max position when released
-        if (slider_at_max) {
-            vTaskDelay(100);
-            enter_deep_sleep();
-        } else {
-            // Reset slider to 0 with animation
-            lv_slider_set_value(slider, 0, LV_ANIM_ON);
-        }
+    // If slider reaches 100, trigger shutdown
+    if (value >= 100) {
+        vTaskDelay(100);
+        enter_deep_sleep();
     }
 }
 
-// Add this function to initialize the slider
+// Modified function to initialize the slider
 void ui_init_turnoff_slider(void) {
     if (ui_turnoffslider == NULL) return;
 
-    // Set initial value to 0
-    lv_slider_set_value(ui_turnoffslider, 0, LV_ANIM_OFF);
+    // Replace the standard slider with an elastic one
+    lv_obj_t* elastic_slider = elastic_slider_create(lv_obj_get_parent(ui_turnoffslider), 0, 0, 100);
 
-    // Set range from 0 to 100
-    lv_slider_set_range(ui_turnoffslider, 0, 100);
+    // Copy the position and size of the original slider
+    lv_obj_set_pos(elastic_slider, lv_obj_get_x(ui_turnoffslider), lv_obj_get_y(ui_turnoffslider));
+    lv_obj_set_size(elastic_slider, lv_obj_get_width(ui_turnoffslider), lv_obj_get_height(ui_turnoffslider));
 
-    // Add event handler
-    lv_obj_add_event_cb(ui_turnoffslider, turnoff_slider_event_cb, LV_EVENT_ALL, NULL);
+    // Set callback for value changes
+    elastic_slider_set_value_changed_cb(elastic_slider, turnoff_slider_value_changed_cb, NULL);
 
+    // Delete the original slider
+    lv_obj_del(ui_turnoffslider);
+
+    // Update the global reference
+    ui_turnoffslider = elastic_slider;
 }
