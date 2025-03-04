@@ -20,9 +20,6 @@
 /* Viber configuration */
 #define VIBER_PIN                GPIO_NUM_46
 
-/* Button Configuration */
-#define MAIN_BUTTON_GPIO GPIO_NUM_8
-
 /* I2C Configuration */
 #define I2C_MASTER_NUM          I2C_NUM_1
 #define I2C_MASTER_SDA_IO       GPIO_NUM_47

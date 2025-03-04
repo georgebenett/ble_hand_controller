@@ -4,7 +4,6 @@ file(GLOB_RECURSE UI_SOURCES
 
 idf_component_register(
     SRCS
-        "button.c"
         "sleep.c"
         "ble_spp_client.c"
         "main.c"
