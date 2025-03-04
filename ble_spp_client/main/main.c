@@ -17,7 +17,7 @@
 #include "lis3dhtr.h"
 #include "battery.h"
 #include "tp_button.h"
-
+#include "ui_updater.h"
 #define TAG "MAIN"
 
 #define BLE_TASK_PRIORITY         9
@@ -121,6 +121,7 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(50));
 
     ui_init();
+    ui_updater_init();
 
     vTaskDelay(pdMS_TO_TICKS(50));
 

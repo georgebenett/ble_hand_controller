@@ -19,26 +19,17 @@ extern "C" {
 void ui_home_screen_screen_init(void);
 extern lv_obj_t * ui_home_screen;
 extern lv_obj_t * ui_Label1;
-extern lv_obj_t * ui_Label2;
 extern lv_obj_t * ui_Bar2;
 extern lv_obj_t * ui_Bar3;
 extern lv_obj_t * ui_controller_battery_icon;
 extern lv_obj_t * ui_controller_battery_text;
 extern lv_obj_t * ui_no_connection_icon;
-extern lv_obj_t * ui_Label5;
 // CUSTOM VARIABLES
 
 // SCREEN: ui_shutdown_screen
 void ui_shutdown_screen_screen_init(void);
 extern lv_obj_t * ui_shutdown_screen;
-extern lv_obj_t * ui_shutdown;
-extern lv_obj_t * ui_Bar4;
-// CUSTOM VARIABLES
-
-// SCREEN: ui_detailed_home
-void ui_detailed_home_screen_init(void);
-extern lv_obj_t * ui_detailed_home;
-extern lv_obj_t * ui_Switch1;
+extern lv_obj_t * ui_turnoffslider;
 // CUSTOM VARIABLES
 
 // SCREEN: ui_splash_screen
@@ -55,14 +46,8 @@ LV_IMG_DECLARE(ui_img_no_connection_png);    // assets/no_connection.png
 LV_IMG_DECLARE(ui_img_gb_png);    // assets/GB.png
 
 // FONTS
-LV_FONT_DECLARE(ui_font_bebas120);
-LV_FONT_DECLARE(ui_font_bebas25);
-LV_FONT_DECLARE(ui_font_bebas30);
-LV_FONT_DECLARE(ui_font_bebas_14);
-LV_FONT_DECLARE(ui_font_bebas50);
 LV_FONT_DECLARE(ui_font_bebas200);
-LV_FONT_DECLARE(ui_font_bebas20);
-LV_FONT_DECLARE(ui_font_bebas75);
+LV_FONT_DECLARE(ui_font_bebas15);
 
 // UI INIT
 void ui_init(void);

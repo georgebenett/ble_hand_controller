@@ -12,6 +12,7 @@
 #define LV_USE_SHADOW 1
 #define LV_USE_BLEND_MODES 1
 #define LV_USE_LOG 1
+#define LV_USE_GESTURE 1
 
 
 #endif

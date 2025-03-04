@@ -1,10 +1,10 @@
 {
-  "codename": "bebas75",
+  "codename": "bebas15",
   "ttf_path": "/assets/BebasNeue-Regular.ttf",
-  "bin_path": "/assets/ui_font_bebas75.bin",
-  "c_path": "/assets/ui_font_bebas75.c",
-  "cfg_path": "/assets/ui_font_bebas75.fcfg",
-  "size": 75,
+  "bin_path": "/assets/ui_font_bebas15.bin",
+  "c_path": "/assets/ui_font_bebas15.c",
+  "cfg_path": "/assets/ui_font_bebas15.fcfg",
+  "size": 15,
   "bpp": 4,
   "letters": 0,
   "ranges": [

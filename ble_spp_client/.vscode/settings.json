@@ -37,6 +37,7 @@
     "gpio.h": "c",
     "esp_lcd_sh8601.h": "c",
     "esp_lcd_touch_ft5x06.h": "c",
-    "lcd.h": "c"
+    "lcd.h": "c",
+    "ui_updater.h": "c"
   }
 }

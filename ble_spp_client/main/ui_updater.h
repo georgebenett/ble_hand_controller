@@ -16,5 +16,6 @@ void ui_update_battery_current(float current);
 void ui_update_consumption(float consumption);
 void ui_update_connection_quality(int rssi);
 void ui_update_connection_icon(void);
+void ui_init_gesture_handling(void);
 
-#endif // UI_UPDATER_H 
+#endif // UI_UPDATER_H

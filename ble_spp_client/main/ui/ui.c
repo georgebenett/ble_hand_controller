@@ -13,28 +13,18 @@
 void ui_home_screen_screen_init(void);
 lv_obj_t * ui_home_screen;
 lv_obj_t * ui_Label1;
-lv_obj_t * ui_Label2;
 lv_obj_t * ui_Bar2;
 lv_obj_t * ui_Bar3;
 lv_obj_t * ui_controller_battery_icon;
 lv_obj_t * ui_controller_battery_text;
 lv_obj_t * ui_no_connection_icon;
-lv_obj_t * ui_Label5;
 // CUSTOM VARIABLES
 
 
 // SCREEN: ui_shutdown_screen
 void ui_shutdown_screen_screen_init(void);
 lv_obj_t * ui_shutdown_screen;
-lv_obj_t * ui_shutdown;
-lv_obj_t * ui_Bar4;
-// CUSTOM VARIABLES
-
-
-// SCREEN: ui_detailed_home
-void ui_detailed_home_screen_init(void);
-lv_obj_t * ui_detailed_home;
-lv_obj_t * ui_Switch1;
+lv_obj_t * ui_turnoffslider;
 // CUSTOM VARIABLES
 
 
@@ -70,7 +60,6 @@ void ui_init(void)
     lv_disp_set_theme(dispp, theme);
     ui_home_screen_screen_init();
     ui_shutdown_screen_screen_init();
-    ui_detailed_home_screen_init();
     ui_splash_screen_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
     lv_disp_load_scr(ui_home_screen);
