@@ -72,16 +72,18 @@ static void gesture_test_cb(lv_event_t *e) {
             break;
         case LV_DIR_TOP:
             ESP_LOGI(TAG, "Gesture: SWIPE UP");
-            // If on shutdown screen, go back to home screen
+            // If on shutdown screen, go back to home screen with animation
             if (current_screen == ui_shutdown_screen) {
-                lv_disp_load_scr(ui_home_screen);
+                // Load home screen with animation (slide up from bottom)
+                lv_scr_load_anim(ui_home_screen, LV_SCR_LOAD_ANIM_MOVE_TOP, 300, 0, false);
             }
             break;
         case LV_DIR_BOTTOM:
             ESP_LOGI(TAG, "Gesture: SWIPE DOWN");
-            // If on home screen, go to shutdown screen
+            // If on home screen, go to shutdown screen with animation
             if (current_screen == ui_home_screen) {
-                lv_disp_load_scr(ui_shutdown_screen);
+                // Load shutdown screen with animation (slide down from top)
+                lv_scr_load_anim(ui_shutdown_screen, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 300, 0, false);
             }
             break;
         default:
