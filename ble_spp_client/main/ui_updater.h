@@ -17,5 +17,7 @@ void ui_update_consumption(float consumption);
 void ui_update_connection_quality(int rssi);
 void ui_update_connection_icon(void);
 void ui_init_gesture_handling(void);
-
+// New gesture test functions
+void ui_init_gesture_test(void);
+void ui_enable_gesture_test(bool enable);
 #endif // UI_UPDATER_H

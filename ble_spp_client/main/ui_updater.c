@@ -12,16 +12,8 @@
 #define SLIDE_START_Y_THRESHOLD 50  // Maximum Y position to start slide
 #define SLIDE_TIMEOUT_MS 500  // Maximum time for slide gesture
 
-typedef struct {
-    int16_t start_x;
-    int16_t start_y;
-    uint32_t start_time;
-    bool tracking;
-} gesture_state_t;
-
-static gesture_state_t gesture_state = {0};
-
 static uint8_t connection_quality = 0;
+static bool gesture_test_enabled = false;
 
 static lv_obj_t* get_current_screen(void) {
     return lv_scr_act();
@@ -65,9 +57,50 @@ void ui_update_connection_icon(void) {
     }
 }
 
+static void gesture_test_cb(lv_event_t *e) {
+    if (!gesture_test_enabled) return;
+
+    lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());
+
+    switch (dir) {
+        case LV_DIR_LEFT:
+            ESP_LOGI(TAG, "Gesture: SWIPE LEFT");
+            break;
+        case LV_DIR_RIGHT:
+            ESP_LOGI(TAG, "Gesture: SWIPE RIGHT");
+            break;
+        case LV_DIR_TOP:
+            ESP_LOGI(TAG, "Gesture: SWIPE UP");
+            break;
+        case LV_DIR_BOTTOM:
+            ESP_LOGI(TAG, "Gesture: SWIPE DOWN");
+            break;
+        default:
+            // Don't log anything for no gesture
+            break;
+    }
+}
+
+void ui_init_gesture_test(void) {
+    // Add gesture event callback to home screen
+    lv_obj_add_event_cb(ui_home_screen, gesture_test_cb, LV_EVENT_GESTURE, NULL);
+    ESP_LOGI(TAG, "Gesture test initialized");
+}
+
+void ui_enable_gesture_test(bool enable) {
+    gesture_test_enabled = enable;
+    ESP_LOGI(TAG, "Gesture test %s", enable ? "enabled" : "disabled");
+}
+
 void ui_updater_init(void) {
     // Initialize gesture handling
     ui_init_gesture_handling();
+
+    // Initialize gesture test
+    ui_init_gesture_test();
+
+    // Enable gesture test by default
+    ui_enable_gesture_test(true);
 }
 
 void ui_update_speed(int32_t value) {
@@ -84,49 +117,16 @@ int get_connection_quality(void) {
 }
 
 void ui_handle_touch_event(lv_event_t * e) {
-    lv_event_code_t code = lv_event_get_code(e);
-
-    // Only track gestures on home screen
-    if (lv_scr_act() != ui_home_screen) {
-        return;
-    }
-
-    if (code == LV_EVENT_PRESSED) {
-        lv_indev_t * indev = lv_indev_get_act();
-        lv_point_t point;
-        lv_indev_get_point(indev, &point);
-
-        // Start tracking if touch begins near top of screen
-        if (point.y < SLIDE_START_Y_THRESHOLD) {
-            gesture_state.start_x = point.x;
-            gesture_state.start_y = point.y;
-            gesture_state.start_time = lv_tick_get();
-            gesture_state.tracking = true;
-        }
-    }
-    else if (code == LV_EVENT_PRESSING) {
-        if (gesture_state.tracking) {
-            lv_indev_t * indev = lv_indev_get_act();
-            lv_point_t point;
-            lv_indev_get_point(indev, &point);
-
-            // Calculate vertical distance and time
-            int16_t delta_y = point.y - gesture_state.start_y;
-            uint32_t delta_time = lv_tick_get() - gesture_state.start_time;
-
-            // Check if it's a valid slide down gesture
-            if (delta_y > SLIDE_DOWN_THRESHOLD && delta_time < SLIDE_TIMEOUT_MS) {
-                lv_disp_load_scr(ui_shutdown_screen);
-                gesture_state.tracking = false;
-            }
-        }
-    }
-    else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-        gesture_state.tracking = false;
-    }
+    // This function is now empty as we're removing the custom slide implementation
+    // We'll rely on LVGL's built-in gesture detection via LV_EVENT_GESTURE
 }
 
 void ui_init_gesture_handling(void) {
-    // Add touch event handler to home screen
+    // We'll still register the event handler for the home screen,
+    // but it will be empty and won't interfere with LVGL's gesture detection
     lv_obj_add_event_cb(ui_home_screen, ui_handle_touch_event, LV_EVENT_ALL, NULL);
+
+    // Make sure the home screen can receive gestures
+    lv_obj_clear_flag(ui_home_screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_flag(ui_home_screen, LV_OBJ_FLAG_CLICKABLE);
 }

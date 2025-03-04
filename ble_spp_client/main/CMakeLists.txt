@@ -22,4 +22,5 @@ idf_component_register(
         "."
         "ui"
     REQUIRES driver nvs_flash bt esp_adc spi_flash esp_lcd lvgl esp_lcd_sh8601 esp_lcd_touch_ft5x06
+    
 )
