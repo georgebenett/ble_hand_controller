@@ -72,6 +72,8 @@ static esp_err_t read_register(uint8_t reg, uint8_t *data)
 esp_err_t lis3dhtr_init(void)
 {
     esp_err_t ret;
+    const int MAX_RETRIES = 3;
+    int retry_count = 0;
 
     // Create mutex for I2C access
     i2c_mutex = xSemaphoreCreateMutex();
@@ -80,12 +82,22 @@ esp_err_t lis3dhtr_init(void)
         return ESP_ERR_NO_MEM;
     }
 
-    // Initialize I2C
-    ret = i2c_master_init();
+    // Initialize I2C with retries
+    while (retry_count < MAX_RETRIES) {
+        ret = i2c_master_init();
+        if (ret == ESP_OK) break;
+        ESP_LOGW(TAG, "I2C init attempt %d failed: %d", retry_count + 1, ret);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        retry_count++;
+    }
+
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to initialize I2C: %d - continuing without accelerometer", ret);
+        ESP_LOGE(TAG, "Failed to initialize I2C after %d attempts", MAX_RETRIES);
         return ESP_ERR_NOT_FOUND;
     }
+
+    // Reset retry counter
+    retry_count = 0;
 
     // Configure INT1 pin
     gpio_config_t io_conf = {
@@ -94,67 +106,55 @@ esp_err_t lis3dhtr_init(void)
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .intr_type = GPIO_INTR_POSEDGE,
     };
-    ret = gpio_config(&io_conf);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure GPIO: %d", ret);
-        return ret;
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+    // Add longer delay after I2C initialization
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    // Test communication with retries
+    while (retry_count < MAX_RETRIES) {
+        uint8_t who_am_i;
+        ret = read_register(LIS3DHTR_REG_WHO_AM_I, &who_am_i);
+
+        if (ret == ESP_OK && who_am_i == LIS3DHTR_WHO_AM_I_VALUE) {
+            break;
+        }
+
+        ESP_LOGW(TAG, "WHO_AM_I read attempt %d failed. ret=%d, value=0x%02x",
+                 retry_count + 1, ret, who_am_i);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        retry_count++;
     }
 
-    // Add a small delay after I2C initialization
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    // Test communication by reading WHO_AM_I register
-    uint8_t who_am_i;
-    ret = read_register(LIS3DHTR_REG_WHO_AM_I, &who_am_i);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to read WHO_AM_I register: %d - accelerometer not found", ret);
+    if (retry_count >= MAX_RETRIES) {
+        ESP_LOGE(TAG, "Failed to verify WHO_AM_I after %d attempts", MAX_RETRIES);
         return ESP_ERR_NOT_FOUND;
     }
 
-    if (who_am_i != LIS3DHTR_WHO_AM_I_VALUE) {
-        ESP_LOGW(TAG, "Invalid WHO_AM_I value: 0x%02x - accelerometer not found", who_am_i);
-        return ESP_ERR_NOT_FOUND;
-    }
+    // Rest of initialization with retries for each write
+    const uint8_t init_regs[][2] = {
+        {LIS3DHTR_REG_CTRL1, 0x47},
+        {LIS3DHTR_REG_CTRL4, 0x00},
+        {LIS3DHTR_REG_CTRL2, 0x09},
+        {LIS3DHTR_REG_CTRL3, 0x40},
+        {LIS3DHTR_REG_INT1_CFG, 0x2A},
+        {LIS3DHTR_REG_INT1_THS, 0x40},
+        {LIS3DHTR_REG_INT1_DURATION, 0x00}
+    };
 
-    // Initialize accelerometer with more aggressive filtering
-    // Enable all axes, normal mode, 50Hz data rate (lower than before)
-    ret = write_register(LIS3DHTR_REG_CTRL1, 0x47);  // 0x47 = 0b01000111
-    if (ret != ESP_OK) return ret;
-
-    // Set scale to ±2g (more sensitive)
-    ret = write_register(LIS3DHTR_REG_CTRL4, 0x00);  // 0x00 = 0b00000000
-    if (ret != ESP_OK) return ret;
-
-    // Enable high-pass filter with highest cutoff frequency
-    ret = write_register(LIS3DHTR_REG_CTRL2, 0x09);  // Enable HP filter with highest cutoff
-    if (ret != ESP_OK) return ret;
-
-    // Configure wake-up detection
-    ret = write_register(LIS3DHTR_REG_CTRL3, 0x40);  // AOI1 interrupt on INT1
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write CTRL3: %d", ret);
-        return ret;
-    }
-
-    // Configure interrupt 1 source
-    ret = write_register(LIS3DHTR_REG_INT1_CFG, 0x2A);  // Enable XYZ high events
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write INT1_CFG: %d", ret);
-        return ret;
-    }
-
-    // Set interrupt threshold (adjust this value based on sensitivity needed)
-    ret = write_register(LIS3DHTR_REG_INT1_THS, 0x40);  // Threshold about 1g
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write INT1_THS: %d", ret);
-        return ret;
-    }
-
-    // Set interrupt duration
-    ret = write_register(LIS3DHTR_REG_INT1_DURATION, 0x00);  // Minimum duration
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write INT1_DURATION: %d", ret);
-        return ret;
+    for (int i = 0; i < sizeof(init_regs)/sizeof(init_regs[0]); i++) {
+        retry_count = 0;
+        while (retry_count < MAX_RETRIES) {
+            ret = write_register(init_regs[i][0], init_regs[i][1]);
+            if (ret == ESP_OK) break;
+            ESP_LOGW(TAG, "Register 0x%02x write attempt %d failed", init_regs[i][0], retry_count + 1);
+            vTaskDelay(pdMS_TO_TICKS(50));
+            retry_count++;
+        }
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to write register 0x%02x", init_regs[i][0]);
+            return ret;
+        }
     }
 
     ESP_LOGI(TAG, "LIS3DHTR initialized successfully");
