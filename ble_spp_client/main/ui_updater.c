@@ -116,6 +116,9 @@ void ui_updater_init(void) {
 
     // Enable gesture test by default
     ui_enable_gesture_test(true);
+
+    // Initialize the turnoff slider
+    ui_init_turnoff_slider();
 }
 
 void ui_update_speed(int32_t value) {
@@ -143,4 +146,55 @@ void ui_init_gesture_handling(void) {
 
     lv_obj_clear_flag(ui_shutdown_screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_flag(ui_shutdown_screen, LV_OBJ_FLAG_CLICKABLE);
+}
+
+// Modified function to handle the slider events
+static void turnoff_slider_event_cb(lv_event_t *e) {
+    lv_obj_t *slider = lv_event_get_target(e);
+    lv_event_code_t code = lv_event_get_code(e);
+
+    // Track if slider has reached 100
+    static bool slider_at_max = false;
+
+    if (code == LV_EVENT_PRESSED) {
+        // User started interacting with the slider
+        slider_at_max = false;
+    }
+    else if (code == LV_EVENT_VALUE_CHANGED) {
+        // While dragging, check if we've reached the maximum value
+        int32_t value = lv_slider_get_value(slider);
+
+        // Just track if we've reached max, but don't trigger shutdown yet
+        if (value >= 100) {
+            slider_at_max = true;
+        } else {
+            slider_at_max = false;
+        }
+    }
+    else if (code == LV_EVENT_RELEASED) {
+
+        // Only trigger shutdown if the slider was at max position when released
+        if (slider_at_max) {
+            vTaskDelay(100);
+            enter_deep_sleep();
+        } else {
+            // Reset slider to 0 with animation
+            lv_slider_set_value(slider, 0, LV_ANIM_ON);
+        }
+    }
+}
+
+// Add this function to initialize the slider
+void ui_init_turnoff_slider(void) {
+    if (ui_turnoffslider == NULL) return;
+
+    // Set initial value to 0
+    lv_slider_set_value(ui_turnoffslider, 0, LV_ANIM_OFF);
+
+    // Set range from 0 to 100
+    lv_slider_set_range(ui_turnoffslider, 0, 100);
+
+    // Add event handler
+    lv_obj_add_event_cb(ui_turnoffslider, turnoff_slider_event_cb, LV_EVENT_ALL, NULL);
+
 }

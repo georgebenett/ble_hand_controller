@@ -20,4 +20,5 @@ void ui_init_gesture_handling(void);
 // New gesture test functions
 void ui_init_gesture_test(void);
 void ui_enable_gesture_test(bool enable);
+void ui_init_turnoff_slider(void);
 #endif // UI_UPDATER_H
